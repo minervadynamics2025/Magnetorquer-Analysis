@@ -2,7 +2,8 @@
 clear; clc;
 
 %% Parameters
-mu0 = 1.257*1e-6;         % Air permeability [H/m]
+mu0 = 1.257*1e-6;          % Air permeability [H/m]
+mu_r = 3500;              % Relative permeability of Hiperco 50A (linear region)
 N_wire = 3210;            % # of wiring
 B_sat = 2.35;             % Saturation flux density [T]
 l_mag = 0.15;             % Core length [m]
@@ -72,7 +73,7 @@ for i = 1:length(H_0)
 end
 
 % Here we fit the relative permability
-mu_fitted = permeabilityModelFit( mu_r, H_f );
+mu_fit = permeabilityModelFit( mu_r, H_f );
 
 figure;
 plot(H_f, mu_fitted)
