@@ -1,11 +1,11 @@
-function [ H_f ] = getHfieldLangevinModel( N_d, H_0, M_s, a )
+function [ H_f ] = getHfieldLangevinModel( N_d, H_0,  )
 %This function calculates the root of hyperbolic tangent model
 % N_d : Demagnetization factor
 % H_0 : Applied magnetazing field
-% M_s : Saturation Magnetization
-% a   : Shape Parameter
+M_s = 4.61 * 1e3; % Approximate saturation magnetization
+a = 600.;         % Shape Parameter
 
-% Langeving model
+% Hyperbolic tangent model
 f = @(x) x -  M_s * (coth((H_0 - N_d * x)/a) - a/(H_0 - N_d * x));
 
 % Initial guess
