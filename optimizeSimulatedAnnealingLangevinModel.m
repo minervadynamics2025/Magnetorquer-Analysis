@@ -15,7 +15,7 @@ H(:,2) = H_init;
 model = @(p, H)  mu0 * (H(:,1) + p(1) * (coth((H(:,2))/p(2)) - p(2)./(H(:,2))));
 
 %% Cost function (least squares)
-cost = @(p) sum(((B/1000 - model(p,H))).^2);
+cost = @(p) sum(((B - model(p,H))).^2);
 
 %% SA Parameters
 maxIter = 5000;
@@ -24,8 +24,8 @@ T_min = 1e-6;
 alpha = 0.95;      % Cooling rate
 
 % Parameter bounds
-lb = [4500, 500];
-ub = [20000, 5000];
+lb = [3000, 1e-7];
+ub = [4000000, 50000];
 
 % Initial solution
 p_current = lb + rand(1,2).*(ub - lb);
@@ -50,7 +50,7 @@ for k = 1:maxIter
         H(i,2) = getHfieldLangevinModel( N_d, H_0(i), p_new(1), p_new(2) );
     end 
     %% Cost function (least squares)
-    cost = @(p) sum(((B/1000. - model(p,H))).^2);
+    cost = @(p) sum(((B - model(p,H))).^2);
     
     cost_new = cost(p_new);
     

@@ -26,7 +26,7 @@ dB_dAlpha = matlabFunction(diff(B_sym, a), 'Vars', [Ms, a, H]);
 params0 = [M_s, a_0];  % Ms in Tesla, alpha unitless
 
 %% Levenberg-Marquardt settings
-maxIter = 100000;
+maxIter = 1000;
 lambda = 0.01;
 tol = 1e-8;
 
@@ -45,7 +45,7 @@ for k = 1:maxIter
         J(i,2) = dB_dAlpha(params(1), params(2), H_f(i));
     end     
     % Compute residuals
-    r = B/1000 - B_calc;
+    r = B - B_calc;
     
     % LM update
     delta_p = (J.'*J + lambda*eye(2)) \ (J.'*r);
@@ -58,7 +58,7 @@ for k = 1:maxIter
     end   
     
     %Check residual
-    r_new = B/1000 - B_calc
+    r_new = B - B_calc;
     
     if norm(r_new) < norm(r)
         params = params_new;
@@ -66,7 +66,7 @@ for k = 1:maxIter
     else
         lambda = lambda * 10;
     end
-    
+    norm(delta_p)
     % Convergence
     if norm(delta_p) < tol
         break;

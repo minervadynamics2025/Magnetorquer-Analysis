@@ -6,12 +6,12 @@ mu0 = 1.257*1e-6;         % Air permeability [H/m]
 N_wire = 3210;            % # of wiring
 B_sat = 2.35;             % Saturation flux density [T]
 l_mag = 0.15;             % Core length [m]
-r_mag = 0.005;            % Core diameter [m]
+r_mag = 0.005;            % Core radius [m]
 d_copper = 0.00032;       % Diameter of copper wire
 r_copper = 1.72e-8;       % Resistivity of copper
 M_s = 8.9 * 1e3;          % Approximate saturation magnetization
 a = 5000.;                % Shape Parameter
-
+t_foot = 0.017;           % Sensor Distance from the tip of the rod       
 
 % The demagnetization factor
 N_d = (4. * log(l_mag/r_mag)-1)/((l_mag/r_mag)^2 - 4. * log(l_mag/r_mag));
@@ -19,10 +19,22 @@ N_d = (4. * log(l_mag/r_mag)-1)/((l_mag/r_mag)^2 - 4. * log(l_mag/r_mag));
 filename = 'Tor-Dyn-25-10 Test Results.xlsx';    % Here we set .xlsx filename
 Magnetorquer_Test_Results = xlsread(filename);   % Here we read the data
 
+
 V = Magnetorquer_Test_Results(:,1); % Voltage applied 
 I = Magnetorquer_Test_Results(:,2); % Measure current 
 H_0 = N_wire * I / l_mag;           % The magnetizing field
-B = Magnetorquer_Test_Results(:,3); % Magnetic field at the tip     
+
+z = linspace(0,l_mag/2, 100); % Sample along z-axis
+[ Bz ] = Bz_on_axis(z, r_mag, l_mag, I(8), mu0);
+% Here we take the volume average of the magnetic field
+Bz_avg = Bz_volume_avg_full(r_mag, l_mag, I(8), mu0);
+% Magnetic field conversion factor for calculating average magnetic field
+% inside the rod from measurements
+AmpFactor =(l_mag * sqrt(r_mag^2 + (l_mag + t_foot).^2).*sqrt(r_mag^2 + t_foot.^2) );
+AmpFactor = (Bz_avg/Bz(1)) * AmpFactor./(((l_mag + t_foot) .* sqrt(r_mag^2 + t_foot.^2) - t_foot .* sqrt(r_mag^2 + (l_mag + t_foot).^2))* sqrt(r_mag^2 + 0.25 * l_mag^2))
+
+%B = Magnetorquer_Test_Results(:,3) * 0.0256; % Magnetic field at the tip     
+B = Magnetorquer_Test_Results(:,3) * AmpFactor/1000.; % Magnetic field at the tip 
 
 figure;
 
@@ -72,13 +84,14 @@ params = fitLMLangevin( B, H_0, N_d, params );
 for i = 1:length(H_0)
     H_f(i) = getHfieldLangevinModel( N_d, H_0(i), params(1), params(2) );  % Magnetizing field 
     M_f(i) = (H_0(i)-H_f(i))/N_d;                                          % Magnetization
-    mu_r(i) = B(i) /( mu0 * H_f(i)) ;                                      % Relative Permeability
-    B_calc(i) = 1000. * mu0 * (H_f(i) + M_f(i));                           % Model Magnetic Field
+    mu_r(i) = B(i) /(mu0 * H_f(i)) ;                                       % Relative Permeability
+    B_calc(i) = mu0 * (H_f(i) + M_f(i));                                   % Model Magnetic Field
 end
 
 % Here we fit the relative permability
 mu_fitted = permeabilityModelFit( mu_r, H_f );
-
+% Here we calculate the dipole moment
+m_d = (pi * l_mag * r_mag^2) * M_f;
 % Average Percent Error
 fprintf('RMS Percent Error = %.3f%%\n', sqrt(mean(((B - B_calc)./B).^2)) * 100);
 
@@ -93,9 +106,9 @@ legend('Fitted Permeability', 'Measurement Data')
 grid on
 
 figure;
-plot(H_0,H_f,'b')
+semilogy(H_0,H_f,'b')
 hold on
-plot(H_0,M_f,'r')
+semilogy(H_0,M_f,'r')
 title('Effective Magnetizing Field for Tor-Dyn-25-10')
 xlabel('H_0 (A/m)')
 ylabel('A/m')
@@ -108,8 +121,16 @@ hold on
 plot(H_0,B,'r*')
 title('Measured vs Model Magnetic Field for Tor-Dyn-25-10')
 xlabel('H_0 (A/m)')
-ylabel('B (mT)')
+ylabel('B (T)')
 legend('Model', 'Measured')
+grid on
+
+
+figure;
+plot(V,m_d,'b')
+title('Dipole Moment for Tor-Dyn-25-10')
+xlabel('V (V)')
+ylabel('m_d (Am^2)')
 grid on
  
 % % Sinle Dipole Moment Calculation
