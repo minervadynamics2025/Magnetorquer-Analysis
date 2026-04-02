@@ -33,8 +33,8 @@ Bz_avg = Bz_volume_avg_full(r_mag, l_mag, I(8), mu0);
 AmpFactor =(l_mag * sqrt(r_mag^2 + (l_mag + t_foot).^2).*sqrt(r_mag^2 + t_foot.^2) );
 AmpFactor = (Bz_avg/Bz(1)) * AmpFactor./(((l_mag + t_foot) .* sqrt(r_mag^2 + t_foot.^2) - t_foot .* sqrt(r_mag^2 + (l_mag + t_foot).^2))* sqrt(r_mag^2 + 0.25 * l_mag^2))
 
-%B = Magnetorquer_Test_Results(:,3) * 0.0256; % Magnetic field at the tip     
-B = Magnetorquer_Test_Results(:,3) * AmpFactor/1000.; % Magnetic field at the tip 
+% Mean Magnetic field multiplied with the amplification factor from measurements from the tip
+B = Magnetorquer_Test_Results(:,3) * AmpFactor/1000.;  
 
 figure;
 
@@ -62,7 +62,6 @@ ylabel('B (mT)')
 xlim([min(H_0) max(H_0)])
 grid on
 
-
 mu_r = zeros(length(H_0),1);   % Relative Permeability
 H_f = zeros(length(H_0),1);    % Effective Magnetizing Field
 M_f = zeros(length(H_0),1);    % Magnetization
@@ -79,8 +78,7 @@ params = optimizeSimulatedAnnealingLangevinModel(N_d, B, H_0, H_f );
 params = fitLMLangevin( B, H_0, N_d, params );
 
 % Here we calculate the effective magnetizing field with the parameters we
-% found with the model, the magnetic field to compare it with the
-% measurement results
+% found with the model, the magnetic field to compare it with the measurement results
 for i = 1:length(H_0)
     H_f(i) = getHfieldLangevinModel( N_d, H_0(i), params(1), params(2) );  % Magnetizing field 
     M_f(i) = (H_0(i)-H_f(i))/N_d;                                          % Magnetization
@@ -99,7 +97,8 @@ figure;
 plot(H_f, mu_fitted)
 hold on
 plot(H_f, mu_r,'r*')
-title('Relative Permeability for Tor-Dyn-25-10')
+title('Relative Permeability')
+%title('Relative Permeability for Tor-Dyn-25-10')
 xlabel('H_{eff} (A/m)')
 ylabel('\mu_r')
 legend('Fitted Permeability', 'Measurement Data')
@@ -109,7 +108,8 @@ figure;
 semilogy(H_0,H_f,'b')
 hold on
 semilogy(H_0,M_f,'r')
-title('Effective Magnetizing Field for Tor-Dyn-25-10')
+title('Effective Magnetizing Field')
+%title('Effective Magnetizing Field for Tor-Dyn-25-10')
 xlabel('H_0 (A/m)')
 ylabel('A/m')
 legend('Effective Magnetizing Field', 'Magnetization')
@@ -119,7 +119,8 @@ figure;
 plot(H_0,B_calc,'b')
 hold on
 plot(H_0,B,'r*')
-title('Measured vs Model Magnetic Field for Tor-Dyn-25-10')
+title('Measured vs Model Magnetic Field')
+%title('Measured vs Model Magnetic Field for Tor-Dyn-25-10')
 xlabel('H_0 (A/m)')
 ylabel('B (T)')
 legend('Model', 'Measured')
