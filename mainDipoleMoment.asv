@@ -134,9 +134,26 @@ grid on
 figure;
 plot(H_0,m_d,'b')
 hold on
-plot(H_0,m_eng,'r')
+plot(H_0,m_eng,'b')
 title('Dipole Moment')
-xlabel('H_0 (A/m)')
+xlabel('H_0 (Am^2)')
 ylabel('m_d (Am^2)')
-legend('Preliminary Design Dipole Moment Curve with \mu_r = 3500', 'Dipole Moment Curve obtained from Langevin Model')
+legend('P', 'Measured')
 grid on
+ 
+% % Sinle Dipole Moment Calculation
+% d = 0.01;                 % Diameter of the rod
+% N = 2800;                 % Number of turns
+% A = pi*(d/2)^2;           % Cross-sectional area [m^2]
+% V = A * l_mag;            % Core volume [m^3]
+% H = N * I / l_mag;        % Magnetizing field [A/m]
+% R = (4 * r_copper * N * d) / (d_copper^2);   % Resistance of Wire
+% V_supply = I * R;         % Voltage
+% 
+% % Dimagnetization factor
+% N_d = (4. * log(2.*l_mag/d) -1)/((2.*l_mag/d)^2 - 4. * log(2.*l_mag/d)); 
+% % Magnetization 
+% M = ((mu_r-1.) * H)/(1+N_d*(mu_r-1)); 
+% 
+% % Dipole moment
+% m_dipole = M * A * l_mag;
