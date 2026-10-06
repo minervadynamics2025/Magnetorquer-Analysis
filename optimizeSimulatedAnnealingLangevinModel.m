@@ -1,85 +1,44 @@
-function [ p_best ] = optimizeSimulatedAnnealingLangevinModel( N_d, B, H_0, H_init )
-% this function finds optimal M_s and a values for Langeving Model
-% B    : Measured Magnetic Field
-% H_init : Initial guess for Magnetizing Field
-% N_d : Demagnetization factor
+function [ p_best ] = optimizeSimulatedAnnealingLangevinModel( N_d, B, H_0, M_s_fixed )
+%OPTIMIZESIMULATEDANNEALINGLANGEVINMODEL Global search for the Langevin parameters.
+% B         : volume-averaged flux density converted from the measurements [T]
+% H_0       : applied magnetizing field H_app [A/m]
+% N_d       : demagnetization factor
+% M_s_fixed : (optional) fix M_s to this value [A/m] and search only for a
+%
+% Returns p_best = [M_s, a].
+%
+% Changes from the previous version
+%  * mu0 = 4*pi*1e-7 everywhere (was 1.257e-6 here and 4*pi*1e-7 in the LM fit)
+%  * the model is B = mu0*(H_eff + M) (the previous cost used mu0*(H_0 + M))
+%  * relative residuals, so all measurement points have equal weight
+%  * the search is done in log-parameter space (parameters span decades)
 
-mu0 = 1.257*1e-6;         % Air permeability [H/m]
+if nargin < 4, M_s_fixed = []; end
+fixMs = ~isempty(M_s_fixed);
 
-% Here we combine H_0 and H_init in a single vector
-H = zeros(length(H_0),2);
-H(:,1) = H_0;
-H(:,2) = H_init;
+lb = log([1e4, 1e-1]);          % bounds of [M_s, a] (log space)
+ub = log([4e6, 5e4]);
+if fixMs, lb(1) = log(M_s_fixed); ub(1) = lb(1); end
 
-%% Langevin Model function for Magnetic Field in mT
-model = @(p, H)  mu0 * (H(:,1) + p(1) * (coth((H(:,2))/p(2)) - p(2)./(H(:,2))));
+cost = @(q) sum(((B - langevinRodModel(exp(q), H_0, N_d))./B).^2);
 
-%% Cost function (least squares)
-cost = @(p) sum(((B - model(p,H))).^2);
-
-%% SA Parameters
 maxIter = 5000;
-T = 1.0;           % Initial temperature
-T_min = 1e-6;
-alpha = 0.95;      % Cooling rate
-
-% Parameter bounds
-lb = [3000, 1e-7];
-ub = [4000000, 50000];
-
-% Initial solution
-p_current = lb + rand(1,2).*(ub - lb);
-cost_current = cost(p_current);
-
-p_best = p_current;
-cost_best = cost_current;
-
-%% SA Loop
+T = 1.0; T_min = 1e-6; alpha = 0.95;
+q_current = lb + rand(1,2).*(ub - lb);
+c_current = cost(q_current);
+q_best = q_current; c_best = c_current;
 for k = 1:maxIter
-    
-    % Generate new candidate (random perturbation)
-    step_size = 0.1*(ub - lb);
-    p_new = p_current + step_size.*randn(size(p_current));
-    
-    % Enforce bounds
-    p_new = max(p_new, lb);
-    p_new = min(p_new, ub);
-    
-    % Here we update Effective Magnetizing Field H_f for new parameters
-    for i=1:length(H_0)
-        H(i,2) = getHfieldLangevinModel( N_d, H_0(i), p_new(1), p_new(2) );
-    end 
-    %% Cost function (least squares)
-    cost = @(p) sum(((B - model(p,H))).^2);
-    
-    cost_new = cost(p_new);
-    
-    % Acceptance criterion
-    if cost_new < cost_current
-        accept = true;
-    else
-        prob = exp(-(cost_new - cost_current)/T);
-        accept = rand < prob;
+    step = 0.1*(ub - lb);
+    q_new = min(max(q_current + step.*randn(1,2), lb), ub);
+    c_new = cost(q_new);
+    if c_new < c_current || rand < exp(-(c_new - c_current)/T)
+        q_current = q_new; c_current = c_new;
     end
-    
-    if accept
-        p_current = p_new;
-        cost_current = cost_new;
+    if c_current < c_best
+        q_best = q_current; c_best = c_current;
     end
-    
-    % Update best solution
-    if cost_current < cost_best
-        p_best = p_current;
-        cost_best = cost_current;
-    end
-    
-    % Cooling
-    T = T * alpha;
-    
-    % Stopping condition
-    if T < T_min
-        break;
-    end
+    T = T*alpha;
+    if T < T_min, break; end
 end
-
+p_best = exp(q_best);
 end

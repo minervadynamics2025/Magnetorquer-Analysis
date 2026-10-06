@@ -1,77 +1,69 @@
-function [ params ] = fitLMLangevin( B, H_0, N_d, params )
-%% LM fitting of Langevin model to magnetorquer B-field measurements
-% N_d : Demagnetization factor
-% H_0 : Applied magnetazing field
-% B   : Measured Magnetic Field
-% params: Initial guess from Simulated Annealing
+function [ params, info ] = fitLMLangevin( B, H_0, N_d, params, M_s_fixed )
+%FITLMLANGEVIN Levenberg-Marquardt refinement of the Langevin parameters.
+% B         : volume-averaged flux density converted from the measurements [T]
+% H_0       : applied magnetizing field H_app [A/m]
+% N_d       : demagnetization factor
+% params    : initial guess [M_s, a] (from simulated annealing)
+% M_s_fixed : (optional) keep M_s fixed at this value and fit only a
+%
+% info.cov  : parameter covariance  sigma^2 (G'G)^-1, sigma^2 = S/(n - n_p)
+% info.sd   : standard deviations, info.corr : correlation(M_s, a) (free fit)
+% info.rms  : RMS relative residual
+%
+% Changes from the previous version
+%  * the Jacobian is computed by finite differences of the FULL model, i.e.
+%    including the dependence of H_eff on (M_s, a) through the demagnetizing
+%    field (the symbolic Jacobian held H_eff fixed, which is incorrect)
+%  * relative residuals; optional fixed M_s; covariance output
 
-M_s = params(1);         % Approximate saturation magnetization
-a_0 = params(2);         % Shape Parameter
-mu0 = 4*pi*1e-7;         % Permeability
+if nargin < 5, M_s_fixed = []; end
+fixMs = ~isempty(M_s_fixed);
+if fixMs, params(1) = M_s_fixed; end
+free = [~fixMs, true];
 
-%% Langevin model function
-syms Ms H a
+resid = @(p) (langevinRodModel(p, H_0, N_d) - B(:))./B(:);
 
-% Langevin function analytically
-B_sym = mu0 * (H + Ms * (coth(H/a) - a/H));        % total B-field
-
-% Convert symbolic function to MATLAB function handle for numeric evaluation
-B_func = matlabFunction(B_sym, 'Vars', [Ms, a, H]);
-
-% Symbolic derivatives (Jacobian)
-dB_dMs = matlabFunction(diff(B_sym, Ms), 'Vars', [Ms, a, H]);
-dB_dAlpha = matlabFunction(diff(B_sym, a), 'Vars', [Ms, a, H]);
-
-%% Initial guess for [Ms, alpha]
-params0 = [M_s, a_0];  % Ms in Tesla, alpha unitless
-
-%% Levenberg-Marquardt settings
-maxIter = 1000;
-lambda = 0.01;
-tol = 1e-8;
-
-B_calc = zeros(length(H_0),1); % Model Magnetic Field
-H_f = zeros(length(H_0),1);    % Effective Magnetizing Field
-params = params0;
+maxIter = 200; lambda = 1e-2; tol = 1e-10;
+p = params(:)';
+r = resid(p);
 for k = 1:maxIter
-    
-    % Jacobian using symbolic derivatives
-    J = zeros(length(H_0), 2);
-    % Here we compute corresponding fields
-    for i=1:length(H_0)
-        H_f(i) = getHfieldLangevinModel( N_d, H_0(i), params(1), params(2) );
-        B_calc(i) = B_func(params(1), params(2), H_f(i));
-        J(i,1) = dB_dMs(params(1), params(2), H_f(i));
-        J(i,2) = dB_dAlpha(params(1), params(2), H_f(i));
-    end     
-    % Compute residuals
-    r = B - B_calc;
-    
-    % LM update
-    delta_p = (J.'*J + lambda*eye(2)) \ (J.'*r);
-    %delta_p = (J.'*J) \ (J.'*r);
-    params_new = params + delta_p';
-    
-    % Here we compute corresponding magnetic field with new parameters
-    for i=1:length(H_0)
-        B_calc(i) = B_func(params_new(1), params_new(2), H_f(i));
-    end   
-    
-    %Check residual
-    r_new = B - B_calc;
-    
+    G = jacobianFD(resid, p, free);
+    dp = zeros(1,2);
+    dp(free) = -((G'*G + lambda*diag(diag(G'*G)))\(G'*r))';
+    p_new = p + dp;
+    if any(p_new <= 0), lambda = lambda*10; continue; end
+    r_new = resid(p_new);
     if norm(r_new) < norm(r)
-        params = params_new;
-        lambda = lambda / 10;
+        p = p_new; r = r_new; lambda = max(lambda/10, 1e-12);
+        if norm(dp./p) < tol, break; end
     else
-        lambda = lambda * 10;
-    end
-    norm(delta_p)
-    % Convergence
-    if norm(delta_p) < tol
-        break;
+        lambda = lambda*10;
+        if lambda > 1e12, break; end
     end
 end
+params = p;
 
+G = jacobianFD(resid, p, free);
+n = numel(B); np = sum(free);
+s2 = sum(r.^2)/(n - np);
+C = zeros(2);
+C(free,free) = s2*inv(G'*G); %#ok<MINV>
+info.cov = C;
+info.sd = sqrt(diag(C))';
+info.corr = NaN;
+if ~fixMs, info.corr = C(1,2)/sqrt(C(1,1)*C(2,2)); end
+info.rms = sqrt(mean(r.^2));
+info.resid = r;
+end
 
+function G = jacobianFD(resid, p, free)
+r0 = resid(p);
+idx = find(free);
+G = zeros(numel(r0), numel(idx));
+for c = 1:numel(idx)
+    j = idx(c);
+    h = 1e-6*p(j);
+    pp = p; pp(j) = p(j) + h;
+    G(:,c) = (resid(pp) - r0)/h;
+end
 end
